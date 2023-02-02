@@ -1,17 +1,17 @@
+<!DOCTYPE html>
 <html>
-    <head>
-        <title>Shared Video Playback</title>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shared Video Playback</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
     </head>
     <body>
+        <section>
         <video id="video" src="/public/sample.mkv" controls class="has-ratio is-16by9 is-fullwidth" style="width:100%;">
             Your browser does not support the video tag (.mkv).
         </video>
-        <!-- <div>
-            <button onclick="pauseVideo()" class="button is-rounded p-1">Pause</button>
-            <button onclick="unpauseVideo()" class="button is-rounded p-1">Play</button>
-            <button onclick="syncTime()" class="button is-rounded p-1">Sync Time</button>
-        </div> -->
+    </section>
         <script src="/public/app.js" defer></script>
     </body>
 </html>

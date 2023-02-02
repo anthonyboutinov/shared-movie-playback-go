@@ -13,7 +13,7 @@ import (
 var clients = make(map[*websocket.Conn]bool) // Keep a map of all connected clients
 
 func main() {
-	http.HandleFunc("/", indexHandler)
+	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/ws", handleWebsocket)
 
 	http.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("./public"))))
@@ -25,7 +25,7 @@ func main() {
 	}
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
+func handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 
 	tmpl, err := template.ParseFiles("templates/index.html")

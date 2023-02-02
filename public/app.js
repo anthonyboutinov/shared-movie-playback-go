@@ -8,23 +8,12 @@ video.addEventListener("pause", onVideoPause);
 let lastInteracted = 0;
 let throttleTimerLength = 500;
 
-// function defer(func) {
-//     setTimeout(func, 50);
-// }
-
 function sendToSocket(data) {
     const now = Date.now();
     if (now - lastInteracted > throttleTimerLength) {
         lastInteracted = now;
         socket.send(JSON.stringify(data));
         console.log("socket.send fired with", data)
-
-        // if (data.type === "sync-time") {
-        //     defer(() => {
-        //         video.pause();
-        //         console.log("Pausing video");
-        //     });
-        // }
     }
 }
 
