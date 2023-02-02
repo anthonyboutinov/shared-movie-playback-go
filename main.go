@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 
@@ -10,12 +11,10 @@ import (
 )
 
 var clients = make(map[*websocket.Conn]bool) // Keep a map of all connected clients
-var broadcast = make(chan string)            // Channel to broadcast messages to all clients
+// var broadcast = make(chan string)            // Channel to broadcast messages to all clients
 
 func main() {
 	http.HandleFunc("/", indexHandler)
-	http.HandleFunc("/pause", pauseHandler)
-	http.HandleFunc("/unpause", unpauseHandler)
 	http.HandleFunc("/ws", handleWebsocket)
 
 	http.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("./public"))))
@@ -29,111 +28,18 @@ func main() {
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintln(w, `
-	<html>
-		<head>
-			<title>Shared Movie Playback</title>
-			<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-		</head>
-		<body>
-			<video id="video" src="/public/sample.mkv" controls class="has-ratio is-16by9 is-fullwidth" style="width:80%;">
-				Your browser does not support the video tag (.mkv).
-			</video>
-			<div>
-				<button onclick="pauseVideo()" class="button is-rounded p-1">Pause</button>
-				<button onclick="unpauseVideo()" class="button is-rounded p-1">Play</button>
-				<button onclick="syncTime()" class="button is-rounded p-1">Sync Time</button>
-			</div>
-			<script>
-				const video = document.getElementById("video");
 
-				video.addEventListener("pause", pauseVideo);
-				video.addEventListener("play", unpauseVideo);
-				video.addEventListener("seeked", syncTime);
+	tmpl, err := template.ParseFiles("templates/index.html")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-				let modifyingVideoState = false;
-
-				async function pauseVideo() {
-					console.log("pauseVideo while modifyingVideoState=", modifyingVideoState)
-					if (modifyingVideoState) {
-						return;
-					}
-					modifyingVideoState = true;
-					await fetch("/pause");
-					video.pause();
-					modifyingVideoState = false;
-				}
-
-				async function unpauseVideo() {
-					console.log("unpauseVideo while modifyingVideoState=", modifyingVideoState)
-					if (modifyingVideoState) {
-						return;
-					}
-					modifyingVideoState = true;
-					await fetch("/unpause");
-					video.play();
-					modifyingVideoState = false;
-				}
-
-				let lastSentTime = 0;
-
-				async function syncTime() {
-					const now = Date.now();
-					if (now - lastSentTime > 500) {
-						lastSentTime = now;
-						// Send a message to the server with the current time
-						socket.send(JSON.stringify({ type: "sync-time", time: video.currentTime }));
-						console.log("socket.send fired with ", { type: "sync-time", time: video.currentTime }, new Date())
-					}
-				}
-
-				// Create the socket object
-				const socket = new WebSocket("ws://localhost:8080/ws");
-
-				// Handle incoming messages from the server
-				socket.onmessage = (event) => {
-					console.log(event);
-					if (event.data === "pause") {
-						video.pause();
-					} else if (event.data === "unpause") {
-						video.play();
-					} else {
-					const message = JSON.parse(event.data);
-						if (message.type === "sync-time") {
-							// Update the video time to the time sent by the server
-							video.currentTime = message.time;
-						}
-					}
-				};
-
-				// Handle the socket connection
-				socket.onopen = (event) => {
-					console.log("socket connected");
-				};
-
-				// Handle socket close event
-				socket.onclose = (event) => {
-					console.log("socket closed");
-				};
-
-				// Handle socket error event
-				socket.onerror = (event) => {
-					console.error("socket error:", event);
-				};
-			</script>
-		</body>
-	</html>
-	`)
-}
-
-func pauseHandler(w http.ResponseWriter, r *http.Request) {
-	broadcast <- "pause"
-	w.Write([]byte("Paused"))
-}
-
-func unpauseHandler(w http.ResponseWriter, r *http.Request) {
-	broadcast <- "unpause"
-	w.Write([]byte("Unpaused"))
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }
 
 /*
@@ -161,19 +67,19 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 				delete(clients, conn)
 				break
 			}
-			broadcast <- string(msg)
+			// broadcast <- string(msg)
 			handleMessage(conn, msg)
 		}
 	}()
 
 	// Send outgoing messages to this client
-	for msg := range broadcast {
-		err := conn.WriteMessage(websocket.TextMessage, []byte(msg))
-		if err != nil {
-			delete(clients, conn)
-			break
-		}
-	}
+	// for msg := range broadcast {
+	// 	err := conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	// 	if err != nil {
+	// 		delete(clients, conn)
+	// 		break
+	// 	}
+	// }
 }
 
 type Message struct {
@@ -204,8 +110,8 @@ func handleMessage(conn *websocket.Conn, message []byte) {
 		return
 	}
 
-	if m.Type == "sync-time" {
-		// Broadcast the sync-time message to all clients
+	if m.Type == "sync-time" || m.Type == "pause" || m.Type == "play" {
+		// Broadcast the sync-time/pause/play message to all clients
 		for c := range clients {
 			err := c.WriteJSON(m)
 			if err != nil {
