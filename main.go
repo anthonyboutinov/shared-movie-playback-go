@@ -11,7 +11,6 @@ import (
 )
 
 var clients = make(map[*websocket.Conn]bool) // Keep a map of all connected clients
-// var broadcast = make(chan string)            // Channel to broadcast messages to all clients
 
 func main() {
 	http.HandleFunc("/", indexHandler)
@@ -43,7 +42,9 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-In this code, the clients map is used to keep track of all connected clients, and the broadcast channel is used to send messages to all clients. The handleWebsocket function handles incoming websocket connections and adds the new client to the clients map. The function also listens for incoming messages from the client and broadcasts them to all clients. The pauseHandler and unpauseHandler functions send messages to the broadcast
+The clients map is used to keep track of all connected clients.
+`handleWebsocket` handles incoming websocket connections and adds the new client to the clients map.
+The function also listens for incoming messages from the client and broadcasts them to all clients.
 */
 func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	// Upgrade the HTTP connection to a websocket connection
@@ -59,38 +60,24 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	// Listen for incoming messages from this client
 	go func() {
 		for {
-			_, msg, err := conn.ReadMessage()
+			_, msg, err := conn.ReadMessage() // Waits for a new message
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					fmt.Println("error:", err)
 				}
+				// Delete problematic client from the list of connected clients
 				delete(clients, conn)
 				break
 			}
-			// broadcast <- string(msg)
 			handleMessage(conn, msg)
 		}
 	}()
-
-	// Send outgoing messages to this client
-	// for msg := range broadcast {
-	// 	err := conn.WriteMessage(websocket.TextMessage, []byte(msg))
-	// 	if err != nil {
-	// 		delete(clients, conn)
-	// 		break
-	// 	}
-	// }
 }
 
 type Message struct {
 	Type string  `json:"type"`
 	Time float64 `json:"time"`
 }
-
-// type Client struct {
-// 	conn *websocket.Conn
-// 	send chan []byte
-// }
 
 // func handleMessage(client *Client, message []byte) {
 func handleMessage(conn *websocket.Conn, message []byte) {
@@ -99,7 +86,7 @@ func handleMessage(conn *websocket.Conn, message []byte) {
 		if r := recover(); r != nil {
 			conn.Close()
 			delete(clients, conn)
-			log.Println("recovered as not nil, removing client")
+			log.Println("Recovered as not nil, removing client")
 		}
 	}()
 
@@ -113,12 +100,14 @@ func handleMessage(conn *websocket.Conn, message []byte) {
 	if m.Type == "sync-time" || m.Type == "pause" || m.Type == "play" {
 		// Broadcast the sync-time/pause/play message to all clients
 		for c := range clients {
-			err := c.WriteJSON(m)
-			if err != nil {
-				conn.Close()
-				delete(clients, conn)
-				log.Println("error:", err)
-				return
+			if c != conn { // Write to all clients except for the sender of this message
+				err := c.WriteJSON(m)
+				if err != nil {
+					conn.Close()
+					delete(clients, conn)
+					log.Println("error:", err)
+					return
+				}
 			}
 		}
 	}
